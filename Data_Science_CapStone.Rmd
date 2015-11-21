@@ -26,7 +26,7 @@ Data preparation for this analysis involved the following key areas:
  
 The imputing process only needed to be performed on the categorical features of the data set as the continuous  features did not contain NAs.  In general, the imputing process employed was largely a logical process depending on the type of information present in the column. For example, NA values in the "Happy Hour" column were set to the value of FALSE. The underlying assumption here is that values of NA in the categorical columns of the data set largely imply that the restaurant does not provide that particular feature.   
 
-It is important to note that this report and its associated artifacts are completely re-producible. Random number generation seeds are set before all pertinent operations to ensure repeatability. Complete R markdown source code can be found at: TODO: PUT THE GITHUB LINK here 
+It is important to note that this report and its associated artifacts are completely re-producible. Random number generation seeds are set before all pertinent operations to ensure repeatability. Complete R markdown source code can be found at: https://github.com/pcomeau/DataScienceCapstone
 
 ```{r data_preparation setoption,cache=TRUE,echo=FALSE,warning=FALSE,message=FALSE}
 library(jsonlite)
