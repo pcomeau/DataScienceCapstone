@@ -1,0 +1,287 @@
+# Title: Why do certain businesses have an unusually high number of reviews compared with other businesses?
+
+## Introduction
+ 
+Why do certain businesses have an unusually high number of reviews compared with other businesses, of the same general type, in the same geographic region (for example restaurants in the Phoenix metropolitan area)? Are there certain characteristics of the business, such as price range, relative location, or whether alcohol is served that drive the high number of reviews?   
+
+## Methods
+
+This Data Science Capstone project is based on the dataset from the [Yelp Dataset Challenge Round 6](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/yelp_dataset_challenge_academic_dataset.zip) competition.  This large data set is provided in 5 separate JSON formatted files:
+* Business Data
+* Checkin Data
+* Review Data 
+* Tip data 
+* User Data
+
+As indicated in the introduction, this analysis will attempt to determine why certain businesses of the same general type, in the same geographic area, have unusually high numbers of reviews. Put another way, are there certain characteristics present in the data set that explain the number of reviews that a business has. The analysis presented in this report specifically uses the Business Data portion of the dataset.  
+
+Additionally, in order to minimize possible effects of confounding variables, this analysis will focus on Restaurants in the Phoenix Area.  One such confounding variable might be regional review volumes. For example, it can be seen from the business data set that, in general, average numbers of reviews in the Las Vegas area have order of magnitude higher reviews than businesses in the Phoenix area. This also has the nice side effect of a more manageable data set.
+                    
+Data preparation for this analysis involved the following key areas:
+
+* Subsetting The Business data by restaurants in the Phoenix area.
+* Removing columns having greater than 95% NA's
+* imputing the remaining columns to remove NA's
+* Flattening of Catagorical Variables 
+ 
+The imputing process only needed to be performed on the categorical features of the data set as the continuous  features did not contain NAs.  In general, the imputing process employed was largely a logical process depending on the type of information present in the column. For example, NA values in the "Happy Hour" column were set to the value of FALSE. The underlying assumption here is that values of NA in the categorical columns of the data set largely imply that the restaurant does not provide that particular feature.   
+
+It is important to note that this report and its associated artifacts are completely re-producible. Random number generation seeds are set before all pertinent operations to ensure repeatability. Complete R markdown source code can be found at: TODO: PUT THE GITHUB LINK here 
+
+```{r data_preparation setoption,cache=TRUE,echo=FALSE,warning=FALSE,message=FALSE}
+library(jsonlite)
+library(data.table)
+library("ggplot2")
+business <- stream_in(file("yelp_academic_dataset_business.json"),verbose=FALSE)
+saveRDS(business, file="business.RDS")
+business <- readRDS("business.RDS")
+source('flatten_business_attributes.R')
+business.attributes.flattened <- as.data.table(flatten.business.attributes(business))
+setkey(business.attributes.flattened,business_id)
+business$cat <- sapply(business$categories, toString)
+library(plyr)
+city.state.dist <- count(business, vars=c("city","state"))
+city.state.dist.bigcities <- data.table(city.state.dist[city.state.dist$freq > 1000,])
+setkey(city.state.dist.bigcities,city)
+setkey(city.state.dist.bigcities,state)
+business.restaurants <- business[grepl("[Rr]estaurant",business$cat),]
+business.restaurants_dt <- data.table(flatten(business.restaurants[ -c(5,9,14) ]))
+setkey(business.restaurants_dt,city)
+setkey(business.restaurants_dt,state)
+business.restaurants.bigcities <- merge(business.restaurants_dt, city.state.dist.bigcities, by=c("city","state"), all.x=FALSE)
+saveRDS(business.restaurants.bigcities, file="business_restaurants_bigcities.RDS")
+business.restaurants.bigcities.flat.attr <- merge(business.restaurants.bigcities, business.attributes.flattened, by="business_id")
+saveRDS(business.restaurants.bigcities.flat.attr, file="business_restaurants_bigcities_flat_attr.RDS")
+business.restaurants.bigcities.az  <- business.restaurants.bigcities.flat.attr[business.restaurants.bigcities.flat.attr$state == "AZ",]  
+saveRDS(business.restaurants.bigcities.az, file="business_restaurants_bigcities_az.RDS")
+
+b <- data.frame(business.restaurants.bigcities.az)
+b1 <- b[,colSums(is.na(b)) < nrow(b)*.95]
+
+# work with NAs
+# set to unknown if open/close is NA
+for(i in 13:26) { b1[is.na(b1[,i]),i] <- "unknown" }
+
+b1$Happy.Hour <- !is.na(b1$Happy.Hour)
+b1$Good.For.Groups <- !is.na(b1$Good.For.Groups)
+b1$Outdoor.Seating <- !is.na(b1$Outdoor.Seating)
+b1$Good.for.Kids <- !is.na(b1$Good.for.Kids)
+# for now, set Price.Range to zero if NA
+b1[is.na(b1$Price.Range),]$Price.Range <- 0
+# for now, set Alcohol to "none" if NA
+b1[is.na(b1$Alcohol),]$Alcohol <- "none"
+# for now, set Noise.Level to "unknown" if NA
+levels(b1$Noise.Level) <- c(levels(b1$Noise.Level), "unknown")
+b1[is.na(b1$Noise.Level),]$Noise.Level <- "unknown"
+b1$Has.TV <- !is.na(b1$Has.TV)
+# for now, set Attire to "unknown" if NA
+levels(b1$Attire) <- c(levels(b1$Attire), "unknown")
+b1[is.na(b1$Attire),]$Attire <- "unknown"
+for(i in 37:48) { b1[,i] <- !is.na(b1[,i]) }
+b1[is.na(b1$Smoking),]$Smoking <- "no"
+for(i in 50:52) { b1[,i] <- !is.na(b1[,i]) }
+b1[is.na(b1$Wi.Fi),]$Wi.Fi <- "no"
+for(i in 54:72) { b1[,i] <- !is.na(b1[,i]) }
+b1[is.na(b1$BYOB.Corkage),]$BYOB.Corkage <- "no"
+# duplicate column 
+b1$Good.For.Kids <- !is.na(b1$Good.For.Kids)
+b1$Dogs.Allowed <- !is.na(b1$Dogs.Allowed)
+final.ds <- b1[c(5,6,8,9,10,28:75)]
+
+
+
+```
+### Explority Data Analysis
+
+```{r echo=FALSE}
+nr <- nrow(final.ds)
+```
+In addition to the continuous variable of interest "review_count", the cleaned and prepared data set contains a total of 52 variables, three continuous variables and 49 categorical variables. The final data set containes `r nr` rows of data.
+
+The features in the final data set are:
+
+```{r fig.width=9, fig.height=4,echo=FALSE}
+names(final.ds)
+```
+Given the few continuous variables, "Star Rating" and "latitude/longitude", it appears that restaurants  having higher review counts generally fall in the range of 4.0 to 4.5 stars as can be seen from the following side by side boxplot.    
+
+```{r fig.width=9, fig.height=4,echo=FALSE}
+library("ggplot2")
+a <- ggplot(business.restaurants.bigcities.az, aes(y=review_count, x=as.factor(stars), fill=stars)) + geom_boxplot() +
+    xlab("Star Rating") + ylab("Review Count") + ggtitle("Review Counts by Star Rating for Resaurants in Phoenix, AZ")
+print(a)
+```
+
+There appears to be no closely correlated continuous variables, so we will employ all of the continuous variables in the modeling process.
+
+```{r fig.width=9, fig.height=4,echo=FALSE}
+correlationMatrix <- cor(final.ds[,2:5])
+print(correlationMatrix)
+```
+
+In keeping with data modeling best practices, a stratified random sample of the cleansed data into training, testing, and validation sets is created.
+
+```{r data segmentation setoption,cache=TRUE,echo=FALSE,warning=FALSE,message=FALSE}
+library("caret")
+library("randomForest")
+
+set.seed(375)
+inBuild <- createDataPartition(final.ds$review_count, p = 0.7,list=FALSE)
+validation <- final.ds[ inBuild,]
+buildData <- final.ds[-inBuild,]
+
+inTrain <- createDataPartition(buildData$review_count, p = 0.7,list=FALSE)
+training <- final.ds[ inTrain,]
+testing <- final.ds[-inTrain,]
+```
+
+```{r segmentation_row_count setoption,cache=TRUE,echo=FALSE,warning=FALSE,message=FALSE}
+ntr <- nrow(training)
+nte <- nrow(testing)
+nval <- nrow(validation)
+```
+The resulting random samples contain, `r ntr`, `r nte`, and `r nval` rows of data respectively.
+
+### Feature Select and Modeling
+
+In order to determine which features might be driving the overall number of reviews for restaurants in the Phoenix area, the "Boruta"" feature selection algorithm is run against the cleansed data set.  In its essence, Boruta works in an iterative manner, and in each iteration the aim is to remove features which according to a statistical test, are less relevant than what is defined by the authors as a random probe.
+
+```{r Boruta setoption,cache=TRUE,echo=FALSE,warning=FALSE,message=FALSE}
+library(Boruta)
+set.seed(825)
+mod2Step <- Boruta(review_count ~ ., data=training,doTrace=2)
+importance.df <- attStats(mod2Step)
+importance.df.confirmed <- importance.df[ importance.df$decision == "Confirmed",]
+#kable(importance.df.confirmed[ order(-importance.df.confirmed$meanZ), ])
+```
+Next a Random Forest model using the caret package train function using the features deemed relivent by the Boruta feature selection algorithm is fit. 
+
+```{r rf_modeling setoption,cache=TRUE,echo=FALSE,warning=FALSE,message=FALSE}
+library(Boruta)
+library("randomForest")
+library(pROC)
+## use repeated K-fold cross-validation 
+fitControl <- trainControl(## 10-fold CV
+  method = "repeatedcv",
+  number = 10,
+  ## repeated ten times
+  repeats = 10)
+
+set.seed(825)
+mod2imp <- train(training$review_count ~ ., data=training[,getSelectedAttributes(mod2Step)], method="rf",
+                            trControl=fitControl,number=3)
+#print(mod2imp)
+corlt <- round(cor(testing[,"review_count"], predict(mod2imp, testing)),2)
+rmse <- round(RMSE(predict(mod2imp, testing), testing$review_count),2)
+auc <- roc(testing[,"review_count"], predict(mod2imp, testing))
+auc_auc <- round(auc$auc,2)
+
+```
+
+As a secondary approach to further understand which features might be driving the overall number of reviews, a Generalized Linear Model with Stepwise Feature Selection, (method = 'glmStepAIC') is also fit.   
+
+```{r glmStep_modeling,cache=TRUE,echo=FALSE,warning=FALSE,message=FALSE,results='hide'}
+set.seed(825)
+training.1 <- training
+names(training.1) <- paste(names(training.1),"END",sep="")
+mod1Step <- train(review_countEND ~ ., data=training.1, method="glmStepAIC",trControl=fitControl)
+```
+
+```{r plot_var_imp,fig.width=9, fig.height=7,echo=FALSE,warning=FALSE,message=FALSE}
+library("caret")
+# Print, plot variable importance
+# print(varImp(mod1Step, scale = FALSE))
+# plot(varImp(mod1Step, scale = FALSE), main="Variable Importance using GLMStepAIC")
+# print(summary(mod1Step))
+
+```
+For both the Random Forest and the Generalized Linear Model, repeated K-fold cross-validation is used with 10 folds repeated 10 times.
+
+## Results
+
+```{r model_interp,echo=FALSE,warning=FALSE,message=FALSE}
+
+mi_rows <- length(row.names(summary(mod1Step)$coefficients))
+mi <- data.frame(coeff = character(mi_rows), low = numeric(mi_rows), high=numeric(mi_rows), 
+                 low.dir=character(mi_rows), high.dir=character(mi_rows),catVal=character(mi_rows))
+mi$coeff <- as.character(mi$coeff)
+mi$low.dir <- as.character(mi$low.dir)
+mi$high.dir <- as.character(mi$high.dir)
+mi$catVal <- as.character(mi$catVal)
+
+for(i in 2:length(row.names(summary(mod1Step)$coefficients))) {
+  mi$coeff[i-1] <- row.names(summary(mod1Step)$coefficients)[i]
+
+  # separate variable name from level for catagoracal variables
+  p <- regexpr('END', mi$coeff[i-1])
+  if(p > 0) {
+    if(p+2 < nchar(mi$coeff[i-1])) {
+      mi$catVal[i-1] <- substr(mi$coeff[i-1],p+3,nchar(mi$coeff[i-1]))
+    }
+    mi$coeff[i-1] <- substr(mi$coeff[i-1],1,p-1)
+  }
+
+  mi$low[i-1] <- summary(mod1Step)$coefficients[i,1]-(((1.97)*summary(mod1Step)$coefficients[i,2]))
+  mi$high[i-1] <- summary(mod1Step)$coefficients[i,1]+(((1.97)*summary(mod1Step)$coefficients[i,2]))
+  if(mi$low[i-1] < 0) mi$low.dir[i-1] = "less" else mi$low.dir[i-1] = "more" 
+  if(mi$high[i-1] < 0) mi$high.dir[i-1] = "less" else mi$high.dir[i-1] = "more" 
+}
+
+```
+
+Given the two modeling techniques, Random forest with Boruta feature selection and Generalized Linear Model with Stepwise Feature Selection, the models generally agree that the following significant predictors drive the number of reviews for a given restaurant in the phoenix area:
+
+* `r mi$coeff`
+
+Further, the Generalized Linear Model predicts that, all else being equal, for a 95% confidence interval,
+
+* when the "`r mi$coeff[1]`" indicator is "`r mi$catVal[1]`", restaurants receive `r abs(round(mi$low[1],2))` `r mi$low.dir[1]` to `r abs(round(mi$high[1],2))` `r mi$high.dir[1]` reviews
+* for each additional degree of "`r mi$coeff[2]`", restaurants receive `r abs(round(mi$low[2],2))` `r mi$low.dir[2]` to `r abs(round(mi$high[2],2))` `r mi$high.dir[2]` reviews
+* for each additonal "`r mi$coeff[3]`" (rating), restaruants receive `r abs(round(mi$low[3],2))` `r mi$low.dir[3]` to `r abs(round(mi$high[3],2))` `r mi$high.dir[3]` reviews
+* for each additional degree of "`r mi$coeff[4]`", restaurants receive `r abs(round(mi$low[4],2))` `r mi$low.dir[4]` to `r abs(round(mi$high[4],2))` `r mi$high.dir[4]` reviews
+* for each additional increase in "`r mi$coeff[5]`", restaurants receive `r abs(round(mi$low[5],2))` `r mi$low.dir[5]` to `r abs(round(mi$high[5],2))` `r mi$high.dir[5]` reviews
+* when the "`r mi$coeff[6]`" indicator is "`r mi$catVal[6]`", restaurants receive `r abs(round(mi$low[6],2))` to `r mi$low.dir[6]` `r abs(round(mi$high[6],2))` `r mi$high.dir[6]` reviews
+* when the "`r mi$coeff[7]`" indicator is "`r mi$catVal[7]`", restaurants receive `r abs(round(mi$low[7],2))` `r mi$low.dir[7]` to `r abs(round(mi$high[7],2))` `r mi$high.dir[7]` reviews
+* when the "`r mi$coeff[8]`" indicator is "`r mi$catVal[8]`", restaurants receive `r abs(round(mi$low[8],2))` `r mi$low.dir[8]` to `r abs(round(mi$high[8],2))` `r mi$high.dir[8]` reviews
+* when the "`r mi$coeff[9]`" indicator is "`r mi$catVal[9]`", restaurants receive `r abs(round(mi$low[9],2))` `r mi$low.dir[9]` to `r abs(round(mi$high[9],2))` `r mi$high.dir[9]` reviews
+* when the "`r mi$coeff[10]`" indicator is "`r mi$catVal[10]`", restaurants receive `r abs(round(mi$low[10],2))` `r mi$low.dir[10]` to `r abs(round(mi$high[10],2))` `r mi$high.dir[10]` reviews
+* when the "`r mi$coeff[11]`" indicator is "`r mi$catVal[11]`", restaurants receive `r abs(round(mi$low[11],2))` to `r mi$low.dir[11]` `r abs(round(mi$high[11],2))` `r mi$high.dir[11]` reviews
+* when the "`r mi$coeff[12]`" indicator is "`r mi$catVal[12]`", restaurants receive `r abs(round(mi$low[12],2))` `r mi$low.dir[12]` to `r abs(round(mi$high[12],2))` `r mi$high.dir[12]` reviews
+* when the "`r mi$coeff[13]`" indicator is "`r mi$catVal[13]`", restaurants receive `r abs(round(mi$low[13],2))` `r mi$low.dir[13]` to `r abs(round(mi$high[13],2))` `r mi$high.dir[13]` reviews
+* when the "`r mi$coeff[14]`" indicator is "`r mi$catVal[14]`", restaurants receive `r abs(round(mi$low[14],2))` `r mi$low.dir[14]` to `r abs(round(mi$high[14],2))` `r mi$high.dir[14]` reviews
+* when the "`r mi$coeff[15]`" indicator is "`r mi$catVal[15]`", restaurants receive `r abs(round(mi$low[15],2))` `r mi$low.dir[15]` to `r abs(round(mi$high[15],2))` `r mi$high.dir[15]` reviews
+* when the "`r mi$coeff[16]`" indicator is "`r mi$catVal[16]`", restaurants receive `r abs(round(mi$low[16],2))` to `r mi$low.dir[16]` `r abs(round(mi$high[16],2))` `r mi$high.dir[16]` reviews
+* when the "`r mi$coeff[17]`" indicator is "`r mi$catVal[17]`", restaurants receive `r abs(round(mi$low[17],2))` `r mi$low.dir[17]` to `r abs(round(mi$high[17],2))` `r mi$high.dir[17]` reviews
+* when the "`r mi$coeff[18]`" indicator is "`r mi$catVal[18]`", restaurants receive `r abs(round(mi$low[18],2))` `r mi$low.dir[18]` to `r abs(round(mi$high[18],2))` `r mi$high.dir[18]` reviews
+* when the "`r mi$coeff[19]`" indicator is "`r mi$catVal[19]`", restaurants receive `r abs(round(mi$low[19],2))` `r mi$low.dir[19]` to `r abs(round(mi$high[19],2))` `r mi$high.dir[19]` reviews
+
+
+
+## Discussion
+
+From a modeling perspective, the predictive power of the resulting random forest model as measured by the area under the ROC curve, of `r auc_auc`, is limited (remember, a ROC area of 50% is essentially equivalent  to a random guess). Also, The associated correlation of the model is `r corlt` and the Root Mean Square Error (RMSE) is `r rmse`. The characteristics of the Generalized Linear model are similar.
+
+Further, as can be seen from the following scatter plots of predicted review counts vs. actual review counts, both of models fall short of correctly predicting the review counts especially in cases of very high review counts. So in conclusion, the predictors present in the data set begin to explain review counts but not entirely. This can also be seen in the residuals of the 2 models.  
+
+```{r disp_pred_glm,fig.width=9, fig.height=3,echo=FALSE,warning=FALSE,message=FALSE}
+library("caret")
+testing.1 <- testing
+names(testing.1) <- paste(names(testing),"END",sep="")
+pred <- predict(mod1Step, testing.1)
+my_data <- as.data.frame(cbind(predicted=pred,observed=testing.1$review_countEND))
+ggplot(my_data,aes(predicted,observed))+geom_point()+geom_smooth(method=lm)+ggtitle('Generalized Linear Model  (GLMStepAIC)')
+```
+```{r disp_pred_rf,fig.width=9, fig.height=3,echo=FALSE,warning=FALSE,message=FALSE}
+library("caret")
+pred <- predict(mod2imp, testing)
+my_data <- as.data.frame(cbind(predicted=pred,observed=testing$review_count))
+ggplot(my_data,aes(predicted,observed))+geom_point()+geom_smooth(method=lm)+ggtitle('Random Forest Model')
+```
+
+Possible future investigations to further understand what drives very high review counts of particular restaurants might be 
+* to employ data around elite reviewers
+* cross reference review counts to other similar web sites such as Google Reviews
+
+
+
+
