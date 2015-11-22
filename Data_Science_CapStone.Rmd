@@ -22,7 +22,7 @@ Data preparation for this analysis involved the following key areas:
 * Subsetting The Business data by restaurants in the Phoenix area.
 * Removing columns having greater than 95% NA's
 * imputing the remaining columns to remove NA's
-* Flattening of Catagorical Variables 
+* Flattening of Categorical Variables 
  
 The imputing process only needed to be performed on the categorical features of the data set as the continuous  features did not contain NAs.  In general, the imputing process employed was largely a logical process depending on the type of information present in the column. For example, NA values in the "Happy Hour" column were set to the value of FALSE. The underlying assumption here is that values of NA in the categorical columns of the data set largely imply that the restaurant does not provide that particular feature.   
 
@@ -91,19 +91,19 @@ final.ds <- b1[c(5,6,8,9,10,28:75)]
 
 
 ```
-### Explority Data Analysis
+### Exploratory Data Analysis
 
 ```{r echo=FALSE}
 nr <- nrow(final.ds)
 ```
-In addition to the continuous variable of interest "review_count", the cleaned and prepared data set contains a total of 52 variables, three continuous variables and 49 categorical variables. The final data set containes `r nr` rows of data.
+In addition to the continuous variable of interest "review_count", the cleaned and prepared data set contains a total of 52 variables, three continuous variables and 49 categorical variables. The final data set contains `r nr` rows of data.
 
 The features in the final data set are:
 
 ```{r fig.width=9, fig.height=4,echo=FALSE}
 names(final.ds)
 ```
-Given the few continuous variables, "Star Rating" and "latitude/longitude", it appears that restaurants  having higher review counts generally fall in the range of 4.0 to 4.5 stars as can be seen from the following side by side boxplot.    
+Given the few continuous variables, "Star Rating" and "latitude/longitude", it appears that restaurants  having higher review counts generally fall in the range of 4.0 to 4.5 stars as can be seen from the following side by side box plot.    
 
 ```{r fig.width=9, fig.height=4,echo=FALSE}
 library("ggplot2")
@@ -154,7 +154,7 @@ importance.df <- attStats(mod2Step)
 importance.df.confirmed <- importance.df[ importance.df$decision == "Confirmed",]
 #kable(importance.df.confirmed[ order(-importance.df.confirmed$meanZ), ])
 ```
-Next a Random Forest model using the caret package train function using the features deemed relivent by the Boruta feature selection algorithm is fit. 
+Next a Random Forest model using the caret package train function using the features deemed relevant by the Boruta feature selection algorithm is fit. 
 
 ```{r rf_modeling setoption,cache=TRUE,echo=FALSE,warning=FALSE,message=FALSE}
 library(Boruta)
@@ -237,7 +237,7 @@ Further, the Generalized Linear Model predicts that, all else being equal, for a
 
 * when the "`r mi$coeff[1]`" indicator is "`r mi$catVal[1]`", restaurants receive `r abs(round(mi$low[1],2))` `r mi$low.dir[1]` to `r abs(round(mi$high[1],2))` `r mi$high.dir[1]` reviews
 * for each additional degree of "`r mi$coeff[2]`", restaurants receive `r abs(round(mi$low[2],2))` `r mi$low.dir[2]` to `r abs(round(mi$high[2],2))` `r mi$high.dir[2]` reviews
-* for each additonal "`r mi$coeff[3]`" (rating), restaruants receive `r abs(round(mi$low[3],2))` `r mi$low.dir[3]` to `r abs(round(mi$high[3],2))` `r mi$high.dir[3]` reviews
+* for each additional "`r mi$coeff[3]`" (rating), restaurants receive `r abs(round(mi$low[3],2))` `r mi$low.dir[3]` to `r abs(round(mi$high[3],2))` `r mi$high.dir[3]` reviews
 * for each additional degree of "`r mi$coeff[4]`", restaurants receive `r abs(round(mi$low[4],2))` `r mi$low.dir[4]` to `r abs(round(mi$high[4],2))` `r mi$high.dir[4]` reviews
 * for each additional increase in "`r mi$coeff[5]`", restaurants receive `r abs(round(mi$low[5],2))` `r mi$low.dir[5]` to `r abs(round(mi$high[5],2))` `r mi$high.dir[5]` reviews
 * when the "`r mi$coeff[6]`" indicator is "`r mi$catVal[6]`", restaurants receive `r abs(round(mi$low[6],2))` to `r mi$low.dir[6]` `r abs(round(mi$high[6],2))` `r mi$high.dir[6]` reviews

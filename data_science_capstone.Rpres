@@ -1,0 +1,37 @@
+Data Science Capstone Project
+========================================================
+author: Paul Comeau
+date: 11/21/2015
+
+Introduction
+========================================================
+
+- Why do certain businesses have an unusually high number of reviews compared with other businesses, of the same general type, in the same geographic region (for example restaurants in the Phoenix metropolitan area)? 
+- Are there certain characteristics of the business, such as price range, relative location, or whether alcohol is served that drive the high number of reviews?
+
+Methods
+========================================================
+
+- Based on the dataset from Yelp Dataset Challenge Round 6 competition
+  - https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/yelp_dataset_challenge_academic_dataset.zip) 
+- Specifically uses business data from Restaurants in Phoenix Area
+- Written in R Markdown as a re-producable Report
+- Employs the "Boruta"" feature selection algorithm and Generalized Linear Model with Stepwise Feature Selection to find relivent features
+- Fit Random Forest and Generalized Linear Model to predict review counts
+
+Results
+========================================================
+
+- Both models generally agree on Features that contribute to number of Reviews
+- Both models fall short of correctly predicting the review counts especially in cases of very high review counts
+![Caption for the picture.](ds_fig1.png)
+![Caption for the picture.](model2.png)
+
+Discussion
+========================================================
+
+- In conclusion, the predictors present in the data set begin to explain review counts but not entirely
+- Possible future investigations to further understand what drives very high review counts of particular restaurants might be 
+  - Employ data around elite reviewers
+  - Cross reference review counts to other similar web sites such as Google Reviews
+
